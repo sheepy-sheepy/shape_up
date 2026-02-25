@@ -80,58 +80,65 @@ class _DiaryPageState extends State<DiaryPage> {
     }
   }
 
-  Map<String, double> _calculateNorms(User user) {
-    if (user.birthDate == null || 
-        user.height == null || 
-        user.weight == null || 
-        user.gender == null || 
-        user.activityLevel == null || 
-        user.goal == null) {
-      return {
-        'calories': 2000,
-        'proteins': 150,
-        'fats': 50,
-        'carbs': 250,
-        'water': 2000,
-      };
-    }
-    
-    final age = _calculator.calculateAge(user.birthDate!);
-    
-    final dci = _calculator.calculateDCI(
-      weight: user.weight!,
-      height: user.height!,
-      age: age,
-      gender: user.gender!,
-      activityLevel: user.activityLevel!,
-    );
-    
-    final calories = _calculator.calculateCalorieNorm(
-      dci: dci,
-      goal: user.goal!,
-      deficit: user.calorieDeficit,
-      surplus: user.calorieSurplus,
-    );
-    
-    final macros = _calculator.calculateMacros(
-      calories: calories,
-      goal: user.goal!,
-    );
-    
-    final water = _calculator.calculateWaterNorm(
-      weight: user.weight!,
-      gender: user.gender!,
-      activityLevel: user.activityLevel!,
-    );
-    
+Map<String, double> _calculateNorms(User user) {
+  if (user.birthDate == null || 
+      user.height == null || 
+      user.weight == null || 
+      user.gender == null || 
+      user.activityLevel == null || 
+      user.goal == null) {
+    // Если данных нет, показываем заглушку
     return {
-      'calories': calories,
-      'proteins': macros['proteins']!,
-      'fats': macros['fats']!,
-      'carbs': macros['carbs']!,
-      'water': water,
+      'calories': 2000,
+      'proteins': 150,
+      'fats': 50,
+      'carbs': 250,
+      'water': 2000,
     };
   }
+  
+  final age = _calculator.calculateAge(user.birthDate!);
+  
+  final dci = _calculator.calculateDCI(
+    weight: user.weight!,
+    height: user.height!,
+    age: age,
+    gender: user.gender!,
+    activityLevel: user.activityLevel!,
+  );
+  
+  final calories = _calculator.calculateCalorieNorm(
+    dci: dci,
+    goal: user.goal!,
+    deficit: user.calorieDeficit ?? 300,
+    surplus: user.calorieSurplus ?? 500,
+  );
+  
+  final macros = _calculator.calculateMacros(
+    calories: calories,
+    goal: user.goal!,
+  );
+  
+  final water = _calculator.calculateWaterNorm(
+    weight: user.weight!,
+    gender: user.gender!,
+    activityLevel: user.activityLevel!,
+  );
+  
+  debugPrint('📊 Calculated norms:');
+  debugPrint('  - Age: $age');
+  debugPrint('  - DCI: $dci');
+  debugPrint('  - Calories: $calories');
+  debugPrint('  - Water: $water');
+  
+  return {
+    'calories': calories,
+    'proteins': macros['proteins']!,
+    'fats': macros['fats']!,
+    'carbs': macros['carbs']!,
+    'water': water,
+  };
+}
 
   @override
   Widget build(BuildContext context) {

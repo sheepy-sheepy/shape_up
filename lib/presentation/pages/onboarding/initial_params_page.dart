@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shape_up/data/datasources/remote/supabase_service.dart';
 import 'package:shape_up/data/repositories/app_repository_provider.dart';
 import 'package:shape_up/domain/entities/body_measurement.dart';
 import 'package:shape_up/domain/entities/user.dart';
@@ -280,63 +281,99 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
         if (authState.user == null) throw Exception('User not found');
 
         final userId = authState.user!.id;
+        final email = authState.user!.email;
 
-        // Сначала проверяем, существует ли пользователь в локальной БД
-        final existingUser =
-            await AppRepositoryProvider.auth.getUserById(userId);
+        // Параметры для сохранения
+        final height = double.parse(_heightController.text);
+        final weight = double.parse(_weightController.text);
+        final neck = double.parse(_neckController.text);
+        final waist = double.parse(_waistController.text);
+        final hip = double.parse(_hipController.text);
 
+        // 1. Сохраняем в Supabase
+        debugPrint('📤 Saving to Supabase...');
+        final supabaseResult = await SupabaseService.saveInitialParams({
+          'height': height,
+          'weight': weight,
+          'neckCircumference': neck,
+          'waistCircumference': waist,
+          'hipCircumference': hip,
+          'gender': _selectedGender,
+          'goal': _selectedGoal,
+          'activityLevel': _selectedActivity,
+          'birthDate': _birthDate!,
+        });
+
+        if (!supabaseResult['success']) {
+          throw Exception(supabaseResult['message']);
+        }
+
+        // 2. Сохраняем в локальную БД
+        debugPrint('💾 Saving to local database...');
         final updatedUser = User(
           id: userId,
-          email: authState.user!.email,
-          height: double.parse(_heightController.text),
-          weight: double.parse(_weightController.text),
-          neckCircumference: double.parse(_neckController.text),
-          waistCircumference: double.parse(_waistController.text),
-          hipCircumference: double.parse(_hipController.text),
+          email: email,
+          height: height,
+          weight: weight,
+          neckCircumference: neck,
+          waistCircumference: waist,
+          hipCircumference: hip,
           gender: _selectedGender,
           goal: _selectedGoal,
           activityLevel: _selectedActivity,
           birthDate: _birthDate,
-          createdAt: existingUser?.createdAt ?? DateTime.now(),
+          createdAt: authState.user!.createdAt,
           hasCompletedInitialParams: true,
         );
 
+        // Проверяем, существует ли пользователь в локальной БД
+        final existingUser =
+            await AppRepositoryProvider.auth.getUserById(userId);
         if (existingUser == null) {
-          // Создаем нового пользователя
           await AppRepositoryProvider.auth.createUser(updatedUser);
         } else {
-          // Обновляем существующего
           await AppRepositoryProvider.auth.updateUser(updatedUser);
         }
 
-        await AppRepositoryProvider.auth.setInitialParamsCompleted(userId);
+        // 3. Сохраняем первую запись измерений
+        debugPrint('📏 Saving body measurements...');
+        final bodyFat = _calculator.calculateBodyFatPercentage(
+          waist: waist,
+          neck: neck,
+          height: height,
+          gender: _selectedGender,
+          hip: hip,
+        );
 
-        // Создаем первую запись измерений
         await AppRepositoryProvider.body.addMeasurement(
           BodyMeasurement(
             userId: userId,
             date: DateTime.now(),
-            weight: double.parse(_weightController.text),
-            neckCircumference: double.parse(_neckController.text),
-            waistCircumference: double.parse(_waistController.text),
-            hipCircumference: double.parse(_hipController.text),
-            bodyFatPercentage: _calculator.calculateBodyFatPercentage(
-              waist: double.parse(_waistController.text),
-              neck: double.parse(_neckController.text),
-              height: double.parse(_heightController.text),
-              gender: _selectedGender,
-              hip: double.parse(_hipController.text),
-            ),
+            weight: weight,
+            neckCircumference: neck,
+            waistCircumference: waist,
+            hipCircumference: hip,
+            bodyFatPercentage: bodyFat,
             createdAt: DateTime.now(),
           ),
         );
 
+        // 4. Отмечаем, что onboarding пройден
+        await AppRepositoryProvider.auth.setInitialParamsCompleted(userId);
+
+        // 5. Обновляем состояние AuthBloc - используем правильное событие
+        context.read<AuthBloc>().add(AuthLoginWithUser(updatedUser));
+
+        debugPrint('✅ All data saved successfully!');
+
         if (!mounted) return;
 
+        // Показываем успешное уведомление
         showDialog(
           context: context,
+          barrierDismissible: false,
           builder: (context) => AlertDialog(
-            title: const Text('Подтверждение'),
+            title: const Text('Успешно!'),
             content: const Text(
                 'Параметры сохранены. Теперь вы можете пользоваться приложением.'),
             actions: [
@@ -345,14 +382,21 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
                   Navigator.pop(context);
                   Navigator.pushReplacementNamed(context, '/main');
                 },
-                child: const Text('OK'),
+                child: const Text('Перейти в дневник'),
               ),
             ],
           ),
         );
       } catch (e) {
+        debugPrint('❌ Error saving params: $e');
+        if (!mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content: Text('Ошибка при сохранении: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
         );
       } finally {
         if (mounted) setState(() => _isLoading = false);

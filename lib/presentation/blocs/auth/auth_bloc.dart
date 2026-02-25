@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '/../../domain/entities/user.dart';
 import '/../../data/datasources/remote/supabase_service.dart';
+import '/../../data/repositories/app_repository_provider.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -11,6 +12,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc() : super(const AuthState.initial()) {
     on<AuthCheckRequested>(_onAuthCheckRequested);
     on<AuthLogin>(_onAuthLogin);
+    on<AuthLoginWithUser>(_onAuthLoginWithUser);
+    on<AuthUpdateUser>(_onAuthUpdateUser);
     on<AuthLogout>(_onAuthLogout);
   }
 
@@ -24,7 +27,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (session != null && supabaseUser != null) {
         if (supabaseUser.emailConfirmedAt != null) {
           final userData = await SupabaseService.getUserData(supabaseUser.id);
-          final user = User.fromJson(userData); // Конвертируем Map в User
+          final user = User.fromJson(userData);
+          
+          // Также проверяем локальное хранилище
+          final hasCompletedParams = await AppRepositoryProvider.auth.getInitialParamsCompleted(user.id);
+          
           emit(state.copyWith(
             isAuthenticated: true,
             user: user,
@@ -56,7 +63,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       
       if (result['success'] == true) {
         final userData = result['user'] as Map<String, dynamic>;
-        final user = User.fromJson(userData); // Конвертируем Map в User
+        final user = User.fromJson(userData);
         
         emit(state.copyWith(
           isAuthenticated: true,
@@ -77,6 +84,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         error: e.toString(),
       ));
     }
+  }
+
+  Future<void> _onAuthLoginWithUser(AuthLoginWithUser event, Emitter<AuthState> emit) async {
+    emit(state.copyWith(
+      isAuthenticated: true,
+      user: event.user,
+      isLoading: false,
+    ));
+  }
+
+  Future<void> _onAuthUpdateUser(AuthUpdateUser event, Emitter<AuthState> emit) async {
+    emit(state.copyWith(
+      isAuthenticated: true,
+      user: event.user,
+    ));
   }
 
   Future<void> _onAuthLogout(AuthLogout event, Emitter<AuthState> emit) async {

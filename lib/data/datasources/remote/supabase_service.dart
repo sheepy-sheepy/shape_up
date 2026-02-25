@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shape_up/data/models/user_model.dart';
+import 'package:shape_up/domain/usecases/calculate_nutrition.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:csv/csv.dart';
 
@@ -163,23 +164,25 @@ class SupabaseService {
       );
 
       if (response.user != null) {
-        // Проверяем, подтвержден ли email
         if (response.user!.emailConfirmedAt == null) {
           await supabase.auth.signOut();
           return {
             'success': false,
-            'message':
-                'Пожалуйста, подтвердите email перед входом. Проверьте папку "Входящие" или "Спам".',
+            'message': 'Пожалуйста, подтвердите email перед входом',
             'emailUnconfirmed': true,
           };
         }
 
-        // Получаем данные пользователя из базы
         final userData = await getUserData(response.user!.id);
+
+        // Проверяем, прошел ли пользователь onboarding
+        final hasCompletedParams =
+            userData['has_completed_initial_params'] == true;
 
         return {
           'success': true,
           'user': userData,
+          'hasCompletedParams': hasCompletedParams,
         };
       }
       return {
@@ -187,13 +190,11 @@ class SupabaseService {
         'message': 'Неверный email или пароль',
       };
     } on AuthException catch (e) {
-      debugPrint('AuthException: ${e.message}');
       return {
         'success': false,
         'message': _getFriendlyErrorMessage(e.message),
       };
     } catch (e) {
-      debugPrint('Error: $e');
       return {
         'success': false,
         'message': e.toString(),
@@ -201,33 +202,62 @@ class SupabaseService {
     }
   }
 
-  // Сохранение начальных параметров пользователя
-  static Future<void> saveInitialParams(Map<String, dynamic> params) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) throw Exception('User not authenticated');
+// Сохранение начальных параметров пользователя
+  static Future<Map<String, dynamic>> saveInitialParams(
+      Map<String, dynamic> params) async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
 
-    await supabase.from('users').update({
-      'height': params['height'],
-      'weight': params['weight'],
-      'neck_circumference': params['neckCircumference'],
-      'waist_circumference': params['waistCircumference'],
-      'hip_circumference': params['hipCircumference'],
-      'gender': params['gender'],
-      'goal': params['goal'],
-      'activity_level': params['activityLevel'],
-      'birth_date': params['birthDate'].toIso8601String(),
-      'has_completed_initial_params': true,
-    }).eq('id', user.id);
+      final updateData = {
+        'height': params['height'],
+        'weight': params['weight'],
+        'neck_circumference': params['neckCircumference'],
+        'waist_circumference': params['waistCircumference'],
+        'hip_circumference': params['hipCircumference'],
+        'gender': params['gender'],
+        'goal': params['goal'],
+        'activity_level': params['activityLevel'],
+        'birth_date':
+            (params['birthDate'] as DateTime).toIso8601String().split('T')[0],
+        'has_completed_initial_params': true,
+      };
 
-    // Создаем первую запись измерений
-    await supabase.from('body_measurements').insert({
-      'user_id': user.id,
-      'date': DateTime.now().toIso8601String().split('T')[0],
-      'weight': params['weight'],
-      'neck_circumference': params['neckCircumference'],
-      'waist_circumference': params['waistCircumference'],
-      'hip_circumference': params['hipCircumference'],
-    });
+      debugPrint('Updating Supabase user with: $updateData');
+
+      final response =
+          await supabase.from('users').update(updateData).eq('id', user.id);
+
+      debugPrint('Supabase update response: $response');
+
+      // Создаем первую запись измерений в Supabase
+      await supabase.from('body_measurements').insert({
+        'user_id': user.id,
+        'date': DateTime.now().toIso8601String().split('T')[0],
+        'weight': params['weight'],
+        'neck_circumference': params['neckCircumference'],
+        'waist_circumference': params['waistCircumference'],
+        'hip_circumference': params['hipCircumference'],
+        'body_fat_percentage': _calculateBodyFatPercentage(params),
+      });
+
+      return {'success': true, 'message': 'Parameters saved'};
+    } catch (e) {
+      debugPrint('Error saving initial params: $e');
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+// Вспомогательный метод для расчета % жира
+  static double _calculateBodyFatPercentage(Map<String, dynamic> params) {
+    final calculator = CalculateNutrition();
+    return calculator.calculateBodyFatPercentage(
+      waist: params['waistCircumference'],
+      neck: params['neckCircumference'],
+      height: params['height'],
+      gender: params['gender'],
+      hip: params['hipCircumference'],
+    );
   }
 
   // Получение продуктов (общие + пользовательские)

@@ -31,18 +31,12 @@ class _LoginPageState extends State<LoginPage> {
             _isLoading = false;
           });
         }
-        
+
         if (state.isAuthenticated && state.user != null) {
           if (state.user!.hasCompletedInitialParams) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const MainPage()),
-            );
+            Navigator.pushReplacementNamed(context, '/main');
           } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const InitialParamsPage()),
-            );
+            Navigator.pushReplacementNamed(context, '/initial-params');
           }
         }
       },
@@ -62,7 +56,7 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 48),
-                
+
                 if (_errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -86,7 +80,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                
+
                 TextFormField(
                   controller: _emailController,
                   decoration: const InputDecoration(
@@ -106,7 +100,7 @@ class _LoginPageState extends State<LoginPage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                
+
                 TextFormField(
                   controller: _passwordController,
                   decoration: const InputDecoration(
@@ -123,7 +117,7 @@ class _LoginPageState extends State<LoginPage> {
                   },
                 ),
                 const SizedBox(height: 24),
-                
+
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -138,7 +132,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 TextButton(
                   onPressed: () {
                     Navigator.push(
@@ -148,9 +142,9 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   child: const Text('Еще нет аккаунта? Зарегистрироваться'),
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Кнопка для повторной отправки письма подтверждения
                 if (_errorMessage?.contains('подтвердите email') ?? false)
                   TextButton(
@@ -174,30 +168,25 @@ class _LoginPageState extends State<LoginPage> {
         _isLoading = true;
         _errorMessage = null;
       });
-      
+
       context.read<AuthBloc>().add(
-        AuthLogin(
-          _emailController.text.trim(), 
-          _passwordController.text
-        )
-      );
+          AuthLogin(_emailController.text.trim(), _passwordController.text));
     }
   }
 
   Future<void> _resendConfirmationEmail() async {
     if (!mounted) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final result = await SupabaseService.resendConfirmationEmail(
-        _emailController.text.trim()
-      );
-      
+          _emailController.text.trim());
+
       if (!mounted) return;
-      
+
       setState(() => _isLoading = false);
-      
+
       if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
