@@ -1,8 +1,8 @@
 // lib/presentation/blocs/auth/auth_bloc.dart
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../data/models/user_model.dart';
-import '../../../data/datasources/remote/supabase_service.dart';
+import '/../../domain/entities/user.dart';
+import '/../../data/datasources/remote/supabase_service.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -18,22 +18,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(state.copyWith(isLoading: true));
     
     try {
-      // Проверка текущей сессии
       final session = SupabaseService.supabase.auth.currentSession;
-      final user = SupabaseService.supabase.auth.currentUser;
+      final supabaseUser = SupabaseService.supabase.auth.currentUser;
       
-      if (session != null && user != null) {
-        // Проверяем, подтвержден ли email
-        if (user.emailConfirmedAt != null) {
-          // Получаем данные пользователя из базы
-          final userData = await SupabaseService.getUserData(user.id);
+      if (session != null && supabaseUser != null) {
+        if (supabaseUser.emailConfirmedAt != null) {
+          final userData = await SupabaseService.getUserData(supabaseUser.id);
+          final user = User.fromJson(userData); // Конвертируем Map в User
           emit(state.copyWith(
             isAuthenticated: true,
-            user: userData,
+            user: user,
             isLoading: false,
           ));
         } else {
-          // Email не подтвержден - выходим
           await SupabaseService.signOut();
           emit(const AuthState.unconfirmedEmail());
         }
@@ -58,7 +55,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       
       if (result['success'] == true) {
-        final user = result['user'] as UserModel;
+        final userData = result['user'] as Map<String, dynamic>;
+        final user = User.fromJson(userData); // Конвертируем Map в User
+        
         emit(state.copyWith(
           isAuthenticated: true,
           user: user,

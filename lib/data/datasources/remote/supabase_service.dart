@@ -102,22 +102,25 @@ class SupabaseService {
   }
 
 // Получение данных пользователя
-  static Future<UserModel> getUserData(String userId) async {
+  static Future<Map<String, dynamic>> getUserData(String userId) async {
     try {
       final response =
           await supabase.from('users').select().eq('id', userId).single();
 
-      return UserModel.fromJson(response);
+      return response;
     } catch (e) {
       debugPrint('Error getting user data: $e');
-      // Если пользователя нет в таблице, создаем базовую запись
+      // Если пользователя нет в таблице, возвращаем базовые данные
       final user = supabase.auth.currentUser;
       if (user != null) {
-        return UserModel(
-          id: user.id,
-          email: user.email!,
-          createdAt: DateTime.now(),
-        );
+        return {
+          'id': user.id,
+          'email': user.email,
+          'created_at': user.createdAt is String
+              ? DateTime.parse(user.createdAt as String)
+              : user.createdAt as DateTime,
+          'has_completed_initial_params': false,
+        };
       }
       rethrow;
     }
@@ -162,7 +165,6 @@ class SupabaseService {
       if (response.user != null) {
         // Проверяем, подтвержден ли email
         if (response.user!.emailConfirmedAt == null) {
-          // Email не подтвержден - выходим из системы
           await supabase.auth.signOut();
           return {
             'success': false,

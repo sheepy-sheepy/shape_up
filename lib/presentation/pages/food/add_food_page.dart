@@ -1,8 +1,13 @@
-// lib/presentation/pages/food/add_food_page.dart
 import 'package:flutter/material.dart';
+import 'package:shape_up/data/repositories/app_repository_provider.dart';
+import 'package:shape_up/domain/entities/food.dart';
+import 'package:shape_up/presentation/blocs/auth/auth_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AddFoodPage extends StatefulWidget {
-  const AddFoodPage({super.key});
+  final Food? food;
+
+  const AddFoodPage({super.key, this.food});
 
   @override
   State<AddFoodPage> createState() => _AddFoodPageState();
@@ -16,12 +21,26 @@ class _AddFoodPageState extends State<AddFoodPage> {
   final _fatsController = TextEditingController();
   final _carbsController = TextEditingController();
   bool _isLoading = false;
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.food != null) {
+      _isEditing = true;
+      _nameController.text = widget.food!.name;
+      _caloriesController.text = widget.food!.calories.toString();
+      _proteinsController.text = widget.food!.proteins.toString();
+      _fatsController.text = widget.food!.fats.toString();
+      _carbsController.text = widget.food!.carbs.toString();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Добавить продукт'),
+        title: Text(_isEditing ? 'Редактировать продукт' : 'Добавить продукт'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -132,7 +151,7 @@ class _AddFoodPageState extends State<AddFoodPage> {
                     onPressed: _isLoading ? null : _saveFood,
                     child: _isLoading
                         ? const CircularProgressIndicator()
-                        : const Text('Сохранить продукт'),
+                        : Text(_isEditing ? 'Сохранить изменения' : 'Сохранить продукт'),
                   ),
                 ),
               ],
@@ -147,18 +166,47 @@ class _AddFoodPageState extends State<AddFoodPage> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       
-      // Имитация сохранения
-      await Future.delayed(const Duration(seconds: 1));
-      
-      if (!mounted) return;
-      
-      setState(() => _isLoading = false);
-      
-      Navigator.pop(context, true);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Продукт добавлен')),
-      );
+      try {
+        final authState = context.read<AuthBloc>().state;
+        if (authState.user == null) throw Exception('User not found');
+        
+        final food = Food(
+          id: widget.food?.id,
+          name: _nameController.text,
+          calories: double.parse(_caloriesController.text),
+          proteins: double.parse(_proteinsController.text),
+          fats: double.parse(_fatsController.text),
+          carbs: double.parse(_carbsController.text),
+          isCustom: true,
+          userId: authState.user!.id,
+          createdAt: DateTime.now(),
+        );
+        
+        if (_isEditing) {
+          await AppRepositoryProvider.food.updateCustomFood(food);
+        } else {
+          await AppRepositoryProvider.food.addCustomFood(food);
+        }
+        
+        if (!mounted) return;
+        
+        Navigator.pop(context, true);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isEditing 
+                ? 'Продукт обновлен' 
+                : 'Продукт добавлен'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 

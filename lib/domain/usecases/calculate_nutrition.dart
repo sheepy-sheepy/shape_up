@@ -31,6 +31,41 @@ class CalculateNutrition {
     }
   }
 
+  double calculateDCI({
+    required double weight,
+    required double height,
+    required int age,
+    required String gender,
+    required String activityLevel,
+  }) {
+    final bmr = calculateBMR(
+      weight: weight,
+      height: height,
+      age: age,
+      gender: gender,
+    );
+    
+    final activityMultiplier = getActivityMultiplier(activityLevel);
+    return bmr * activityMultiplier;
+  }
+
+  double calculateCalorieNorm({
+    required double dci,
+    required String goal,
+    int? deficit,
+    int? surplus,
+  }) {
+    switch (goal) {
+      case 'Похудение':
+        return dci - (deficit ?? 300);
+      case 'Набор массы':
+        return dci + (surplus ?? 500);
+      case 'Поддержание':
+      default:
+        return dci;
+    }
+  }
+
   Map<String, double> calculateMacros({
     required double calories,
     required String goal,
@@ -60,9 +95,9 @@ class CalculateNutrition {
     }
 
     return {
-      'proteins': (calories * proteinPercent) / 4, // 4 kcal per gram
-      'fats': (calories * fatPercent) / 9, // 9 kcal per gram
-      'carbs': (calories * carbPercent) / 4, // 4 kcal per gram
+      'proteins': (calories * proteinPercent) / 4,
+      'fats': (calories * fatPercent) / 9,
+      'carbs': (calories * carbPercent) / 4,
     };
   }
 
@@ -105,12 +140,24 @@ class CalculateNutrition {
     double? hip,
   }) {
     if (gender == 'Мужской') {
-      // % жира = 86,010 x log10(waist - neck) - 70,041 x log10(height) + 36,76
-      return 86.010 * log((waist - neck) / ln10) - 70.041 * log(height / ln10) + 36.76;
+      return 86.010 * log((waist - neck) / ln10) - 
+             70.041 * log(height / ln10) + 
+             36.76;
     } else {
-      // % жира = 163,205 x log10(waist + hip - neck) - 97,684 x log10(height) - 78,387
       if (hip == null) return 0;
-      return 163.205 * log((waist + hip - neck) / ln10) - 97.684 * log(height / ln10) - 78.387;
+      return 163.205 * log((waist + hip - neck) / ln10) - 
+             97.684 * log(height / ln10) - 
+             78.387;
     }
+  }
+
+  int calculateAge(DateTime birthDate) {
+    final today = DateTime.now();
+    int age = today.year - birthDate.year;
+    if (today.month < birthDate.month || 
+        (today.month == birthDate.month && today.day < birthDate.day)) {
+      age--;
+    }
+    return age;
   }
 }

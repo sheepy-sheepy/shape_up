@@ -1,6 +1,9 @@
-// lib/presentation/pages/food/food_search_page.dart
 import 'package:flutter/material.dart';
+import 'package:shape_up/data/repositories/app_repository_provider.dart';
+import 'package:shape_up/domain/entities/food.dart';
+import 'package:shape_up/presentation/blocs/auth/auth_bloc.dart';
 import 'package:shape_up/presentation/pages/food/food_detail_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class FoodSearchPage extends StatefulWidget {
   final String mealType;
@@ -20,32 +23,45 @@ class FoodSearchPage extends StatefulWidget {
 
 class _FoodSearchPageState extends State<FoodSearchPage> {
   final _searchController = TextEditingController();
-  
-  // Mock data - replace with actual data from database
-  final List<Map<String, dynamic>> _foods = [
-    {'id': 1, 'name': 'Антилопа', 'calories': 114.0, 'proteins': 22.38, 'fats': 2.03, 'carbs': 0.0, 'isCustom': false},
-    {'id': 2, 'name': 'Говядина', 'calories': 250.0, 'proteins': 26.0, 'fats': 15.0, 'carbs': 0.0, 'isCustom': false},
-    {'id': 3, 'name': 'Куриная грудка', 'calories': 165.0, 'proteins': 31.0, 'fats': 3.6, 'carbs': 0.0, 'isCustom': false},
-    {'id': 4, 'name': 'Рис', 'calories': 130.0, 'proteins': 2.7, 'fats': 0.3, 'carbs': 28.0, 'isCustom': false},
-    {'id': 5, 'name': 'Гречка', 'calories': 343.0, 'proteins': 13.0, 'fats': 3.4, 'carbs': 72.0, 'isCustom': false},
-  ];
-
-  List<Map<String, dynamic>> _filteredFoods = [];
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _filteredFoods = _foods;
-    _searchController.addListener(_filterFoods);
+    _searchController.addListener(_onSearchChanged);
+    _loadInitialData();
   }
 
-  void _filterFoods() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredFoods = _foods.where((food) {
-        return food['name'].toLowerCase().contains(query);
-      }).toList();
-    });
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoading = true);
+    await _performSearch('');
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _onSearchChanged() async {
+    final query = _searchController.text;
+    await _performSearch(query);
+  }
+
+  Future<void> _performSearch(String query) async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState.user == null) return;
+
+      final results = await AppRepositoryProvider.food.searchFoodsAndRecipes(
+        authState.user!.id,
+        query,
+      );
+
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+        });
+      }
+    } catch (e) {
+      debugPrint('Search error: $e');
+    }
   }
 
   @override
@@ -60,9 +76,19 @@ class _FoodSearchPageState extends State<FoodSearchPage> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
+              autofocus: true,
               decoration: InputDecoration(
-                hintText: 'Поиск...',
+                hintText: 'Поиск продуктов и рецептов...',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          FocusScope.of(context).unfocus();
+                        },
+                      )
+                    : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -70,39 +96,87 @@ class _FoodSearchPageState extends State<FoodSearchPage> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: _filteredFoods.length,
-              itemBuilder: (context, index) {
-                final food = _filteredFoods[index];
-                return ListTile(
-                  title: Text(food['name']),
-                  subtitle: Text(
-                    'КБЖУ на 100г: ${food['calories']} ккал, '
-                    '${food['proteins']}г б, ${food['fats']}г ж, ${food['carbs']}г у',
-                  ),
-                  onTap: () {
-                    if (widget.isAddingToRecipe) {
-                      Navigator.pop(context, food);
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => FoodDetailPage(
-                            food: food,
-                            mealType: widget.mealType,
-                            date: widget.date,
-                          ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _searchResults.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search_off, size: 64, color: Colors.grey),
+                            SizedBox(height: 16),
+                            Text(
+                              'Ничего не найдено',
+                              style: TextStyle(fontSize: 18, color: Colors.grey),
+                            ),
+                          ],
                         ),
-                      );
-                    }
-                  },
-                );
-              },
-            ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          final item = _searchResults[index];
+                          final isRecipe = item['type'] == 'recipe';
+                          
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: isRecipe
+                                  ? const Icon(Icons.restaurant_menu, color: Colors.green)
+                                  : const Icon(Icons.fastfood, color: Colors.blue),
+                              title: Text(
+                                item['name'],
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                '${item['calories'].toStringAsFixed(1)} ккал/100г • '
+                                '${item['proteins'].toStringAsFixed(1)}г б • '
+                                '${item['fats'].toStringAsFixed(1)}г ж • '
+                                '${item['carbs'].toStringAsFixed(1)}г у',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _selectItem(item),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
     );
+  }
+
+  void _selectItem(Map<String, dynamic> item) {
+    if (widget.isAddingToRecipe) {
+      // Для добавления в рецепт возвращаем продукт
+      Navigator.pop(context, {
+        'food': Food(
+          id: item['id'],
+          name: item['name'],
+          calories: item['calories'],
+          proteins: item['proteins'],
+          fats: item['fats'],
+          carbs: item['carbs'],
+          isCustom: item['isCustom'] ?? false,
+          isRecipe: item['isRecipe'] ?? false,
+          recipeId: item['recipeId'],
+        ),
+      });
+    } else {
+      // Для добавления в прием пищи
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FoodDetailPage(
+            food: item,
+            mealType: widget.mealType,
+            date: widget.date,
+          ),
+        ),
+      ).then((_) => Navigator.pop(context));
+    }
   }
 
   @override

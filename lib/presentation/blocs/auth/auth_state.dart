@@ -3,7 +3,7 @@ part of 'auth_bloc.dart';
 
 class AuthState extends Equatable {
   final bool isAuthenticated;
-  final UserModel? user;
+  final User? user;
   final bool isLoading;
   final String? error;
   final bool emailUnconfirmed;
@@ -32,7 +32,7 @@ class AuthState extends Equatable {
 
   AuthState copyWith({
     bool? isAuthenticated,
-    UserModel? user,
+    User? user,
     bool? isLoading,
     String? error,
     bool? emailUnconfirmed,

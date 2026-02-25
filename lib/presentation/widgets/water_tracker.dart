@@ -1,21 +1,28 @@
-// lib/presentation/widgets/water_tracker.dart
 import 'package:flutter/material.dart';
 
 class WaterTracker extends StatefulWidget {
-  const WaterTracker({super.key});
+  final int waterNorm;
+  final int waterConsumed;
+  final Function(int) onWaterAdded;
+
+  const WaterTracker({
+    super.key,
+    required this.waterNorm,
+    required this.waterConsumed,
+    required this.onWaterAdded,
+  });
 
   @override
   State<WaterTracker> createState() => _WaterTrackerState();
 }
 
 class _WaterTrackerState extends State<WaterTracker> {
-  int _waterConsumed = 1500;
-  final int _waterNorm = 2500;
   final TextEditingController _waterController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    final progress = _waterConsumed / _waterNorm;
+    final progress = widget.waterConsumed / widget.waterNorm;
+    final remaining = widget.waterNorm - widget.waterConsumed;
 
     return Card(
       margin: const EdgeInsets.all(16),
@@ -29,18 +36,48 @@ class _WaterTrackerState extends State<WaterTracker> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              minHeight: 10,
-              backgroundColor: Colors.blue.shade100,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+            
+            // Прогресс бар
+            Stack(
+              children: [
+                LinearProgressIndicator(
+                  value: progress.clamp(0.0, 1.0),
+                  minHeight: 20,
+                  backgroundColor: Colors.blue.shade100,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                ),
+                Positioned.fill(
+                  child: Center(
+                    child: Text(
+                      '${widget.waterConsumed} мл / ${widget.waterNorm} мл',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+            
             const SizedBox(height: 8),
-            Text(
-              '$_waterConsumed мл / $_waterNorm мл',
-              style: const TextStyle(fontSize: 16),
-            ),
+            
+            // Остаток
+            if (remaining > 0)
+              Text(
+                'Осталось: $remaining мл',
+                style: const TextStyle(color: Colors.blue),
+              )
+            else
+              const Text(
+                'Норма выполнена!',
+                style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+              ),
+            
             const SizedBox(height: 16),
+            
+            // Поле ввода
             Row(
               children: [
                 Expanded(
@@ -54,19 +91,25 @@ class _WaterTrackerState extends State<WaterTracker> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.remove, color: Colors.red),
-                  onPressed: _removeWater,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.red.shade50,
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.remove, color: Colors.red),
+                    onPressed: _removeWater,
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.add, color: Colors.green),
-                  onPressed: _addWater,
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.green.shade50,
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.add, color: Colors.green),
+                    onPressed: _addWater,
                   ),
                 ),
               ],
@@ -78,21 +121,17 @@ class _WaterTrackerState extends State<WaterTracker> {
   }
 
   void _addWater() {
-    final ml = int.tryParse(_waterController.text) ?? 0;
-    if (ml > 0) {
-      setState(() {
-        _waterConsumed = (_waterConsumed + ml).clamp(0, _waterNorm * 2);
-      });
+    final ml = int.tryParse(_waterController.text);
+    if (ml != null && ml > 0) {
+      widget.onWaterAdded(ml);
       _waterController.clear();
     }
   }
 
   void _removeWater() {
-    final ml = int.tryParse(_waterController.text) ?? 0;
-    if (ml > 0) {
-      setState(() {
-        _waterConsumed = (_waterConsumed - ml).clamp(0, _waterConsumed);
-      });
+    final ml = int.tryParse(_waterController.text);
+    if (ml != null && ml > 0) {
+      widget.onWaterAdded(-ml);
       _waterController.clear();
     }
   }

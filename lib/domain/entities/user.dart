@@ -1,3 +1,4 @@
+// lib/domain/entities/user.dart
 class User {
   final String id;
   final String email;
@@ -34,4 +35,48 @@ class User {
     required this.createdAt,
     this.hasCompletedInitialParams = false,
   });
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      id: json['id'] as String,
+      email: json['email'] as String,
+      name: json['name'] as String?,
+      birthDate: json['birth_date'] != null 
+          ? DateTime.parse(json['birth_date'] as String) 
+          : null,
+      gender: json['gender'] as String?,
+      height: (json['height'] as num?)?.toDouble(),
+      weight: (json['weight'] as num?)?.toDouble(),
+      neckCircumference: (json['neck_circumference'] as num?)?.toDouble(),
+      waistCircumference: (json['waist_circumference'] as num?)?.toDouble(),
+      hipCircumference: (json['hip_circumference'] as num?)?.toDouble(),
+      goal: json['goal'] as String?,
+      activityLevel: json['activity_level'] as String?,
+      calorieDeficit: json['calorie_deficit'] as int?,
+      calorieSurplus: json['calorie_surplus'] as int?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      hasCompletedInitialParams: json['has_completed_initial_params'] == 1 ? true : false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'name': name,
+      'birth_date': birthDate?.toIso8601String(),
+      'gender': gender,
+      'height': height,
+      'weight': weight,
+      'neck_circumference': neckCircumference,
+      'waist_circumference': waistCircumference,
+      'hip_circumference': hipCircumference,
+      'goal': goal,
+      'activity_level': activityLevel,
+      'calorie_deficit': calorieDeficit,
+      'calorie_surplus': calorieSurplus,
+      'created_at': createdAt.toIso8601String(),
+      'has_completed_initial_params': hasCompletedInitialParams ? 1 : 0,
+    };
+  }
 }

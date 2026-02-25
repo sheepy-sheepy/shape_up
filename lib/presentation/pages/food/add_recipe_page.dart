@@ -1,9 +1,15 @@
-// lib/presentation/pages/food/add_recipe_page.dart
 import 'package:flutter/material.dart';
+import 'package:shape_up/data/repositories/app_repository_provider.dart';
+import 'package:shape_up/domain/entities/food.dart';
+import 'package:shape_up/domain/entities/recipe.dart';
+import 'package:shape_up/presentation/blocs/auth/auth_bloc.dart';
 import 'package:shape_up/presentation/pages/food/food_search_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AddRecipePage extends StatefulWidget {
-  const AddRecipePage({super.key});
+  final Recipe? recipe;
+
+  const AddRecipePage({super.key, this.recipe});
 
   @override
   State<AddRecipePage> createState() => _AddRecipePageState();
@@ -13,14 +19,26 @@ class _AddRecipePageState extends State<AddRecipePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   
-  List<Map<String, dynamic>> _ingredients = [];
+  List<RecipeIngredient> _ingredients = [];
   bool _isLoading = false;
+  bool _isEditing = false;
 
   double _totalCalories = 0;
   double _totalProteins = 0;
   double _totalFats = 0;
   double _totalCarbs = 0;
   double _totalGrams = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.recipe != null) {
+      _isEditing = true;
+      _nameController.text = widget.recipe!.name;
+      _ingredients = List.from(widget.recipe!.ingredients);
+      _calculateTotals();
+    }
+  }
 
   void _calculateTotals() {
     _totalCalories = 0;
@@ -30,12 +48,11 @@ class _AddRecipePageState extends State<AddRecipePage> {
     _totalGrams = 0;
     
     for (var ingredient in _ingredients) {
-      final grams = ingredient['grams'] as double;
-      _totalCalories += (ingredient['calories'] as double) * grams / 100;
-      _totalProteins += (ingredient['proteins'] as double) * grams / 100;
-      _totalFats += (ingredient['fats'] as double) * grams / 100;
-      _totalCarbs += (ingredient['carbs'] as double) * grams / 100;
-      _totalGrams += grams;
+      _totalCalories += ingredient.calories;
+      _totalProteins += ingredient.proteins;
+      _totalFats += ingredient.fats;
+      _totalCarbs += ingredient.carbs;
+      _totalGrams += ingredient.grams;
     }
     
     setState(() {});
@@ -45,7 +62,7 @@ class _AddRecipePageState extends State<AddRecipePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Добавить рецепт'),
+        title: Text(_isEditing ? 'Редактировать рецепт' : 'Добавить рецепт'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -89,15 +106,17 @@ class _AddRecipePageState extends State<AddRecipePage> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
-                    child: Text('Добавьте ингредиенты'),
+                    child: Text('Добавьте ингредиенты (минимум 2)'),
                   ),
                 )
               else
-                ..._ingredients.asMap().entries.map((entry) => _buildIngredientItem(entry.value, entry.key)),
-              
-              const Divider(height: 32),
+                ..._ingredients.asMap().entries.map((entry) => 
+                  _buildIngredientItem(entry.value, entry.key)
+                ),
               
               if (_ingredients.isNotEmpty) ...[
+                const Divider(height: 32),
+                
                 const Text(
                   'Пищевая ценность рецепта:',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -108,7 +127,6 @@ class _AddRecipePageState extends State<AddRecipePage> {
                 _buildNutritionRow('Общие жиры:', '${_totalFats.toStringAsFixed(1)} г'),
                 _buildNutritionRow('Общие углеводы:', '${_totalCarbs.toStringAsFixed(1)} г'),
                 _buildNutritionRow('Общий вес:', '${_totalGrams.toStringAsFixed(1)} г'),
-                const SizedBox(height: 8),
                 
                 if (_totalGrams > 0) ...[
                   const Divider(),
@@ -131,10 +149,10 @@ class _AddRecipePageState extends State<AddRecipePage> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading || _ingredients.isEmpty ? null : _saveRecipe,
+                  onPressed: _isLoading || _ingredients.length < 2 ? null : _saveRecipe,
                   child: _isLoading
                       ? const CircularProgressIndicator()
-                      : const Text('Сохранить рецепт'),
+                      : Text(_isEditing ? 'Сохранить изменения' : 'Сохранить рецепт'),
                 ),
               ),
             ],
@@ -144,15 +162,15 @@ class _AddRecipePageState extends State<AddRecipePage> {
     );
   }
 
-  Widget _buildIngredientItem(Map<String, dynamic> ingredient, int index) {
+  Widget _buildIngredientItem(RecipeIngredient ingredient, int index) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text(ingredient['name']),
+        title: Text(ingredient.foodName),
         subtitle: Text(
-          '${ingredient['grams']}г - '
-          '${((ingredient['calories'] as double) * ingredient['grams'] / 100).toStringAsFixed(1)} ккал, '
-          '${((ingredient['proteins'] as double) * ingredient['grams'] / 100).toStringAsFixed(1)}г б'
+          '${ingredient.grams}г - '
+          '${ingredient.calories.toStringAsFixed(1)} ккал, '
+          '${ingredient.proteins.toStringAsFixed(1)}г б',
         ),
         trailing: IconButton(
           icon: const Icon(Icons.close, color: Colors.red),
@@ -163,16 +181,7 @@ class _AddRecipePageState extends State<AddRecipePage> {
             });
           },
         ),
-        onTap: () async {
-          // Редактирование количества грамм
-          final result = await _showGramsDialog(ingredient['grams'].toDouble());
-          if (result != null) {
-            setState(() {
-              ingredient['grams'] = result;
-              _calculateTotals();
-            });
-          }
-        },
+        onTap: () => _editIngredient(ingredient, index),
       ),
     );
   }
@@ -188,6 +197,63 @@ class _AddRecipePageState extends State<AddRecipePage> {
         ],
       ),
     );
+  }
+
+  Future<void> _addIngredient() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FoodSearchPage(
+          mealType: 'ingredient',
+          date: DateTime.now(),
+          isAddingToRecipe: true,
+        ),
+      ),
+    );
+    
+    if (result != null && result is Map<String, dynamic>) {
+      final grams = await _showGramsDialog(100);
+      if (grams != null) {
+        final food = result['food'] as Food;
+        final ingredient = RecipeIngredient(
+          recipeId: widget.recipe?.id ?? 0,
+          foodId: food.id!,
+          grams: grams,
+          isCustomFood: food.isCustom,
+          foodName: food.name,
+          foodCalories: food.calories,
+          foodProteins: food.proteins,
+          foodFats: food.fats,
+          foodCarbs: food.carbs,
+        );
+        
+        setState(() {
+          _ingredients.add(ingredient);
+          _calculateTotals();
+        });
+      }
+    }
+  }
+
+  Future<void> _editIngredient(RecipeIngredient ingredient, int index) async {
+    final grams = await _showGramsDialog(ingredient.grams);
+    if (grams != null) {
+      setState(() {
+        _ingredients[index] = RecipeIngredient(
+          id: ingredient.id,
+          recipeId: ingredient.recipeId,
+          foodId: ingredient.foodId,
+          grams: grams,
+          isCustomFood: ingredient.isCustomFood,
+          foodName: ingredient.foodName,
+          foodCalories: ingredient.foodCalories,
+          foodProteins: ingredient.foodProteins,
+          foodFats: ingredient.foodFats,
+          foodCarbs: ingredient.foodCarbs,
+        );
+        _calculateTotals();
+      });
+    }
   }
 
   Future<double?> _showGramsDialog(double currentGrams) async {
@@ -224,47 +290,52 @@ class _AddRecipePageState extends State<AddRecipePage> {
     );
   }
 
-  void _addIngredient() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FoodSearchPage(
-          mealType: 'ingredient',
-          date: DateTime.now(),
-          isAddingToRecipe: true,
-        ),
-      ),
-    );
-    
-    if (result != null && result is Map<String, dynamic>) {
-      final grams = await _showGramsDialog(100);
-      if (grams != null) {
-        setState(() {
-          _ingredients.add({
-            ...result,
-            'grams': grams,
-          });
-          _calculateTotals();
-        });
-      }
-    }
-  }
-
   Future<void> _saveRecipe() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       
-      await Future.delayed(const Duration(seconds: 1));
-      
-      if (!mounted) return;
-      
-      setState(() => _isLoading = false);
-      
-      Navigator.pop(context, true);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Рецепт добавлен')),
-      );
+      try {
+        final authState = context.read<AuthBloc>().state;
+        if (authState.user == null) throw Exception('User not found');
+        
+        final recipe = Recipe(
+          id: widget.recipe?.id,
+          name: _nameController.text,
+          userId: authState.user!.id,
+          ingredients: _ingredients,
+          totalCalories: _totalCalories,
+          totalProteins: _totalProteins,
+          totalFats: _totalFats,
+          totalCarbs: _totalCarbs,
+          totalGrams: _totalGrams,
+          createdAt: DateTime.now(),
+        );
+        
+        if (_isEditing) {
+          await AppRepositoryProvider.food.updateRecipe(recipe);
+        } else {
+          await AppRepositoryProvider.food.addRecipe(recipe);
+        }
+        
+        if (!mounted) return;
+        
+        Navigator.pop(context, true);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isEditing 
+                ? 'Рецепт обновлен' 
+                : 'Рецепт добавлен'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 

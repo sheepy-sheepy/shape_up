@@ -1,6 +1,11 @@
-// lib/presentation/pages/onboarding/initial_params_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shape_up/data/repositories/app_repository_provider.dart';
+import 'package:shape_up/domain/entities/body_measurement.dart';
+import 'package:shape_up/domain/entities/user.dart';
+import 'package:shape_up/domain/usecases/calculate_nutrition.dart';
+import 'package:shape_up/presentation/blocs/auth/auth_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class InitialParamsPage extends StatefulWidget {
   const InitialParamsPage({super.key});
@@ -23,6 +28,7 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
   DateTime? _birthDate;
 
   bool _isLoading = false;
+  final _calculator = CalculateNutrition();
 
   @override
   Widget build(BuildContext context) {
@@ -148,11 +154,11 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
 
               // Пол
               DropdownButtonFormField<String>(
+                value: _selectedGender,
                 decoration: const InputDecoration(
                   labelText: 'Пол',
                   border: OutlineInputBorder(),
                 ),
-                value: _selectedGender,
                 items: const [
                   DropdownMenuItem(value: 'Мужской', child: Text('Мужской')),
                   DropdownMenuItem(value: 'Женский', child: Text('Женский')),
@@ -180,11 +186,11 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
 
               // Цель
               DropdownButtonFormField<String>(
+                value: _selectedGoal,
                 decoration: const InputDecoration(
                   labelText: 'Цель',
                   border: OutlineInputBorder(),
                 ),
-                value: _selectedGoal,
                 items: const [
                   DropdownMenuItem(
                       value: 'Похудение', child: Text('Похудение')),
@@ -203,11 +209,11 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
 
               // Уровень активности
               DropdownButtonFormField<String>(
+                value: _selectedActivity,
                 decoration: const InputDecoration(
                   labelText: 'Уровень активности',
                   border: OutlineInputBorder(),
                 ),
-                value: _selectedActivity,
                 items: const [
                   DropdownMenuItem(
                       value: 'Сидячий образ жизни',
@@ -269,33 +275,87 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
     if (_formKey.currentState!.validate() && _birthDate != null) {
       setState(() => _isLoading = true);
 
-      // Имитация сохранения
-      await Future.delayed(const Duration(seconds: 2));
+      try {
+        final authState = context.read<AuthBloc>().state;
+        if (authState.user == null) throw Exception('User not found');
 
-      setState(() => _isLoading = false);
+        final userId = authState.user!.id;
 
-      if (mounted) {
+        // Сначала проверяем, существует ли пользователь в локальной БД
+        final existingUser =
+            await AppRepositoryProvider.auth.getUserById(userId);
+
+        final updatedUser = User(
+          id: userId,
+          email: authState.user!.email,
+          height: double.parse(_heightController.text),
+          weight: double.parse(_weightController.text),
+          neckCircumference: double.parse(_neckController.text),
+          waistCircumference: double.parse(_waistController.text),
+          hipCircumference: double.parse(_hipController.text),
+          gender: _selectedGender,
+          goal: _selectedGoal,
+          activityLevel: _selectedActivity,
+          birthDate: _birthDate,
+          createdAt: existingUser?.createdAt ?? DateTime.now(),
+          hasCompletedInitialParams: true,
+        );
+
+        if (existingUser == null) {
+          // Создаем нового пользователя
+          await AppRepositoryProvider.auth.createUser(updatedUser);
+        } else {
+          // Обновляем существующего
+          await AppRepositoryProvider.auth.updateUser(updatedUser);
+        }
+
+        await AppRepositoryProvider.auth.setInitialParamsCompleted(userId);
+
+        // Создаем первую запись измерений
+        await AppRepositoryProvider.body.addMeasurement(
+          BodyMeasurement(
+            userId: userId,
+            date: DateTime.now(),
+            weight: double.parse(_weightController.text),
+            neckCircumference: double.parse(_neckController.text),
+            waistCircumference: double.parse(_waistController.text),
+            hipCircumference: double.parse(_hipController.text),
+            bodyFatPercentage: _calculator.calculateBodyFatPercentage(
+              waist: double.parse(_waistController.text),
+              neck: double.parse(_neckController.text),
+              height: double.parse(_heightController.text),
+              gender: _selectedGender,
+              hip: double.parse(_hipController.text),
+            ),
+            createdAt: DateTime.now(),
+          ),
+        );
+
+        if (!mounted) return;
+
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Подтверждение'),
             content: const Text(
-                'Параметры нельзя будет изменить после сохранения. Продолжить?'),
+                'Параметры сохранены. Теперь вы можете пользоваться приложением.'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Отмена'),
-              ),
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
                   Navigator.pushReplacementNamed(context, '/main');
                 },
-                child: const Text('Подтвердить'),
+                child: const Text('OK'),
               ),
             ],
           ),
         );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     } else if (_birthDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(

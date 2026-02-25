@@ -1,8 +1,8 @@
 // lib/presentation/pages/splash/splash_page.dart
 import 'package:flutter/material.dart';
-import 'package:shape_up/presentation/pages/auth/login_page.dart';
-import 'package:shape_up/presentation/pages/onboarding/initial_params_page.dart';
-import 'package:shape_up/presentation/pages/main/main_page.dart';
+import 'package:shape_up/data/repositories/app_repository_provider.dart';
+import 'package:shape_up/presentation/blocs/auth/auth_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -19,32 +19,24 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _checkAuthStatus() async {
-    // Имитация загрузки
     await Future.delayed(const Duration(seconds: 2));
     
     if (!mounted) return;
     
-    // В реальном приложении здесь будет проверка из SharedPreferences
-    final isAuthenticated = false;
-    final hasCompletedParams = false;
+    final authState = context.read<AuthBloc>().state;
     
-    if (isAuthenticated) {
+    if (authState.isAuthenticated && authState.user != null) {
+      final hasCompletedParams = await AppRepositoryProvider.auth.getInitialParamsCompleted(
+        authState.user!.id,
+      ) || authState.user!.hasCompletedInitialParams;
+      
       if (hasCompletedParams) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainPage()),
-        );
+        Navigator.pushReplacementNamed(context, '/main');
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const InitialParamsPage()),
-        );
+        Navigator.pushReplacementNamed(context, '/initial-params');
       }
     } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-      );
+      Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
