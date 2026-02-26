@@ -1,5 +1,6 @@
 // lib/presentation/blocs/auth/auth_bloc.dart
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '/../../domain/entities/user.dart';
 import '/../../data/datasources/remote/supabase_service.dart';
@@ -17,25 +18,59 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLogout>(_onAuthLogout);
   }
 
-  Future<void> _onAuthCheckRequested(AuthCheckRequested event, Emitter<AuthState> emit) async {
+  Future<void> _onAuthCheckRequested(
+      AuthCheckRequested event, Emitter<AuthState> emit) async {
     emit(state.copyWith(isLoading: true));
-    
+
     try {
       final session = SupabaseService.supabase.auth.currentSession;
       final supabaseUser = SupabaseService.supabase.auth.currentUser;
-      
+
       if (session != null && supabaseUser != null) {
         if (supabaseUser.emailConfirmedAt != null) {
+          // Получаем данные из Supabase
           final userData = await SupabaseService.getUserData(supabaseUser.id);
           final user = User.fromJson(userData);
-          
-          // Также проверяем локальное хранилище
-          final hasCompletedParams = await AppRepositoryProvider.auth.getInitialParamsCompleted(user.id);
-          
+
+          // Принудительно синхронизируем с локальной БД
+          try {
+            final existingUser =
+                await AppRepositoryProvider.auth.getUserById(user.id);
+            if (existingUser == null) {
+              await AppRepositoryProvider.auth.createUser(user);
+            } else {
+              await AppRepositoryProvider.auth.updateUser(user);
+            }
+            debugPrint('✅ User synced with local DB');
+          } catch (e) {
+            debugPrint('⚠️ Local DB sync error: $e');
+          }
+
+          // Проверяем наличие всех необходимых параметров
+          final hasParams = user.height != null &&
+              user.weight != null &&
+              user.birthDate != null &&
+              user.gender != null &&
+              user.goal != null &&
+              user.activityLevel != null;
+
+          debugPrint('📊 User data from Supabase:');
+          debugPrint('  - height: ${user.height}');
+          debugPrint('  - weight: ${user.weight}');
+          debugPrint('  - birthDate: ${user.birthDate}');
+          debugPrint(
+              '  - hasCompletedInitialParams: ${user.hasCompletedInitialParams}');
+          debugPrint('  - hasParams from data: $hasParams');
+
+          // Используем комбинированную проверку
+          final shouldShowOnboarding =
+              !user.hasCompletedInitialParams || !hasParams;
+
           emit(state.copyWith(
             isAuthenticated: true,
             user: user,
             isLoading: false,
+            needsOnboarding: shouldShowOnboarding,
           ));
         } else {
           await SupabaseService.signOut();
@@ -45,6 +80,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(const AuthState.initial());
       }
     } catch (e) {
+      debugPrint('❌ Auth check error: $e');
       emit(state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -54,17 +90,39 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _onAuthLogin(AuthLogin event, Emitter<AuthState> emit) async {
     emit(state.copyWith(isLoading: true, error: null));
-    
+
     try {
-      final result = await SupabaseService.signIn(
-        event.email, 
-        event.password
-      );
-      
+      final result = await SupabaseService.signIn(event.email, event.password);
+
       if (result['success'] == true) {
         final userData = result['user'] as Map<String, dynamic>;
         final user = User.fromJson(userData);
-        
+
+        // Принудительно синхронизируем с локальной БД
+        try {
+          final existingUser =
+              await AppRepositoryProvider.auth.getUserById(user.id);
+          if (existingUser == null) {
+            await AppRepositoryProvider.auth.createUser(user);
+          } else {
+            await AppRepositoryProvider.auth.updateUser(user);
+          }
+        } catch (e) {
+          debugPrint('⚠️ Local DB sync error: $e');
+        }
+
+        final hasParams = user.height != null &&
+            user.weight != null &&
+            user.birthDate != null;
+
+        debugPrint('📊 User data from Supabase:');
+        debugPrint('  - height: ${user.height}');
+        debugPrint('  - weight: ${user.weight}');
+        debugPrint('  - birthDate: ${user.birthDate}');
+        debugPrint(
+            '  - hasCompletedInitialParams: ${user.hasCompletedInitialParams}');
+        debugPrint('  - hasParams from data: $hasParams');
+
         emit(state.copyWith(
           isAuthenticated: true,
           user: user,
@@ -86,7 +144,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  Future<void> _onAuthLoginWithUser(AuthLoginWithUser event, Emitter<AuthState> emit) async {
+  Future<void> _onAuthLoginWithUser(
+      AuthLoginWithUser event, Emitter<AuthState> emit) async {
     emit(state.copyWith(
       isAuthenticated: true,
       user: event.user,
@@ -94,7 +153,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     ));
   }
 
-  Future<void> _onAuthUpdateUser(AuthUpdateUser event, Emitter<AuthState> emit) async {
+  Future<void> _onAuthUpdateUser(
+      AuthUpdateUser event, Emitter<AuthState> emit) async {
     emit(state.copyWith(
       isAuthenticated: true,
       user: event.user,

@@ -20,22 +20,28 @@ class _SplashPageState extends State<SplashPage> {
 
   Future<void> _checkAuthStatus() async {
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (!mounted) return;
-    
+
     final authState = context.read<AuthBloc>().state;
-    
+
     if (authState.isAuthenticated && authState.user != null) {
-      final hasCompletedParams = await AppRepositoryProvider.auth.getInitialParamsCompleted(
-        authState.user!.id,
-      ) || authState.user!.hasCompletedInitialParams;
-      
-      if (hasCompletedParams) {
+      debugPrint('👤 User authenticated: ${authState.user!.email}');
+      debugPrint(
+          '👤 Has completed params: ${authState.user!.hasCompletedInitialParams}');
+      debugPrint('👤 Needs onboarding: ${authState.needsOnboarding}');
+
+      // Используем комбинированную проверку
+      if (authState.user!.hasCompletedInitialParams &&
+          !authState.needsOnboarding) {
+        debugPrint('➡️ Redirecting to main page');
         Navigator.pushReplacementNamed(context, '/main');
       } else {
+        debugPrint('➡️ Redirecting to initial params page');
         Navigator.pushReplacementNamed(context, '/initial-params');
       }
     } else {
+      debugPrint('➡️ Redirecting to login page');
       Navigator.pushReplacementNamed(context, '/login');
     }
   }

@@ -53,11 +53,20 @@ class AuthRepository {
   Future<User> createUser(User user) async {
     final db = await database.database;
 
-    await db.insert(
-      'users',
-      _userToMap(user),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    final map = _userToMap(user);
+    debugPrint('📝 Creating user in local DB: $map');
+
+    try {
+      await db.insert(
+        'users',
+        map,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      debugPrint('✅ User created in local DB');
+    } catch (e) {
+      debugPrint('❌ Error creating user in local DB: $e');
+      rethrow;
+    }
 
     return user;
   }

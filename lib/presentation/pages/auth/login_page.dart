@@ -33,7 +33,13 @@ class _LoginPageState extends State<LoginPage> {
         }
 
         if (state.isAuthenticated && state.user != null) {
-          if (state.user!.hasCompletedInitialParams) {
+          debugPrint('✅ Login successful for: ${state.user!.email}');
+          debugPrint(
+              '✅ Has completed params: ${state.user!.hasCompletedInitialParams}');
+          debugPrint('✅ Needs onboarding: ${state.needsOnboarding}');
+
+          // Используем ту же логику, что и в splash
+          if (state.user!.hasCompletedInitialParams && !state.needsOnboarding) {
             Navigator.pushReplacementNamed(context, '/main');
           } else {
             Navigator.pushReplacementNamed(context, '/initial-params');

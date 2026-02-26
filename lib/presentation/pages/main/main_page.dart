@@ -1,5 +1,7 @@
 // lib/presentation/pages/main/main_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shape_up/presentation/blocs/auth/auth_bloc.dart';
 import 'package:shape_up/presentation/pages/analytics/analytics_page.dart';
 import 'package:shape_up/presentation/pages/diary/diary_page.dart';
 import 'package:shape_up/presentation/pages/food/food_page.dart';
@@ -33,52 +35,56 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_getTitle()),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: _pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.accessibility_new),
-            label: 'Параметры',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.photo_camera),
-            label: 'Фото',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: 'Дневник',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.fastfood),
-            label: 'Продукты',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.analytics),
-            label: 'Аналитика',
-          ),
-        ],
+    return WillPopScope(
+      onWillPop: () async {
+        // Блокируем кнопку "назад" на всех экранах main_page
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_getTitle()),
+          automaticallyImplyLeading: false, // Убираем стрелку назад
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                Navigator.pushNamed(context, '/settings');
+              },
+            ),
+          ],
+        ),
+        body: _pages[_currentIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.accessibility_new),
+              label: 'Параметры',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.photo_camera),
+              label: 'Фото',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.book),
+              label: 'Дневник',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.fastfood),
+              label: 'Продукты',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics),
+              label: 'Аналитика',
+            ),
+          ],
+        ),
       ),
     );
   }

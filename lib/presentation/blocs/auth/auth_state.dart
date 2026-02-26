@@ -7,6 +7,7 @@ class AuthState extends Equatable {
   final bool isLoading;
   final String? error;
   final bool emailUnconfirmed;
+  final bool needsOnboarding; // Добавлено поле
 
   const AuthState({
     required this.isAuthenticated,
@@ -14,6 +15,7 @@ class AuthState extends Equatable {
     this.isLoading = false,
     this.error,
     this.emailUnconfirmed = false,
+    this.needsOnboarding = false,
   });
 
   const AuthState.initial()
@@ -21,14 +23,16 @@ class AuthState extends Equatable {
         user = null,
         isLoading = false,
         error = null,
-        emailUnconfirmed = false;
+        emailUnconfirmed = false,
+        needsOnboarding = false;
 
   const AuthState.unconfirmedEmail()
       : isAuthenticated = false,
         user = null,
         isLoading = false,
         error = 'Пожалуйста, подтвердите email перед входом',
-        emailUnconfirmed = true;
+        emailUnconfirmed = true,
+        needsOnboarding = false;
 
   AuthState copyWith({
     bool? isAuthenticated,
@@ -36,6 +40,7 @@ class AuthState extends Equatable {
     bool? isLoading,
     String? error,
     bool? emailUnconfirmed,
+    bool? needsOnboarding,
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -43,9 +48,17 @@ class AuthState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
       emailUnconfirmed: emailUnconfirmed ?? this.emailUnconfirmed,
+      needsOnboarding: needsOnboarding ?? this.needsOnboarding,
     );
   }
 
   @override
-  List<Object?> get props => [isAuthenticated, user, isLoading, error, emailUnconfirmed];
+  List<Object?> get props => [
+    isAuthenticated, 
+    user, 
+    isLoading, 
+    error, 
+    emailUnconfirmed,
+    needsOnboarding
+  ];
 }

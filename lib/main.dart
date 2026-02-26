@@ -25,25 +25,54 @@ import 'package:shape_up/presentation/pages/food/food_detail_page.dart';
 import 'package:shape_up/presentation/pages/food/add_food_page.dart';
 import 'package:shape_up/presentation/pages/food/add_recipe_page.dart';
 
-Future<void> _resetDatabase() async {
-  try {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'fitness_app.db');
-    final file = File(path);
-    if (await file.exists()) {
-      await file.delete();
-      debugPrint('✅ Old database deleted');
-    }
-  } catch (e) {
-    debugPrint('Error deleting database: $e');
-  }
-}
+// Future<void> _resetDatabase() async {
+//   try {
+//     final dbPath = await getDatabasesPath();
+//     final path = join(dbPath, 'fitness_app.db');
+//     final file = File(path);
+//     if (await file.exists()) {
+//       await file.delete();
+//       debugPrint('✅ Old database deleted successfully');
+//     }
+
+//     // Также удаляем файл журнала, если есть
+//     final journalPath = join(dbPath, 'fitness_app.db-journal');
+//     final journalFile = File(journalPath);
+//     if (await journalFile.exists()) {
+//       await journalFile.delete();
+//       debugPrint('✅ Database journal deleted');
+//     }
+
+//     // Проверяем права на запись в директорию
+//     final directory = Directory(dbPath);
+//     if (await directory.exists()) {
+//       // Проверяем, можем ли мы писать в директорию
+//       final testFile = File(join(dbPath, 'test.txt'));
+//       await testFile.writeAsString('test');
+//       await testFile.delete();
+//       debugPrint('✅ Write permission confirmed');
+//     }
+//   } catch (e) {
+//     debugPrint('❌ Error deleting database: $e');
+//   }
+// }
+
+// Future<void> _clearSharedPreferences() async {
+//   try {
+//     final prefs = await SharedPreferences.getInstance();
+//     await prefs.clear();
+//     debugPrint('✅ SharedPreferences cleared');
+//   } catch (e) {
+//     debugPrint('❌ Error clearing SharedPreferences: $e');
+//   }
+// }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-    // Сбрасываем БД перед инициализацией
-  await _resetDatabase();
+
+
+  // await _resetDatabase();
+  // await _clearSharedPreferences();
 
 // Initialize localization for Russian
   try {
@@ -58,15 +87,9 @@ void main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
-  // Initialize local database
   await AppDatabase.init();
-
   await AppRepositoryProvider.initialize();
-
-  // Load initial foods from CSV
   await SupabaseService.loadInitialFoods();
-
-  // Initialize SharedPreferences
   await SharedPreferences.getInstance();
 
   runApp(const MyApp());
@@ -97,6 +120,8 @@ class MyApp extends StatelessWidget {
         locale: const Locale('ru', 'RU'),
         initialRoute: '/',
         onGenerateRoute: (settings) {
+          debugPrint('📍 Navigation to: ${settings.name}');
+
           switch (settings.name) {
             case '/':
               return MaterialPageRoute(builder: (_) => const SplashPage());

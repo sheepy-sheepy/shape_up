@@ -1,5 +1,8 @@
 // lib/presentation/pages/settings/settings_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shape_up/data/datasources/remote/supabase_service.dart';
+import 'package:shape_up/presentation/blocs/auth/auth_bloc.dart';
 import 'package:shape_up/presentation/pages/auth/login_page.dart';
 import 'package:shape_up/domain/usecases/calculate_nutrition.dart';
 
@@ -20,7 +23,7 @@ class _SettingsPageState extends State<SettingsPage> {
   final _heightController = TextEditingController();
   final _oldPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
-  
+
   // Данные для отображения BMR/DCI
   double _bmr = 0;
   double _dci = 0;
@@ -38,17 +41,18 @@ class _SettingsPageState extends State<SettingsPage> {
     const double weight = 70;
     const double height = 175;
     const int age = 30;
-    
+
     _bmr = _calculator.calculateBMR(
       weight: weight,
       height: height,
       age: age,
       gender: _gender,
     );
-    
-    final activityMultiplier = _calculator.getActivityMultiplier(_activityLevel);
+
+    final activityMultiplier =
+        _calculator.getActivityMultiplier(_activityLevel);
     _dci = _bmr * activityMultiplier;
-    
+
     switch (_selectedGoal) {
       case 'Похудение':
         _calorieNorm = _dci - _deficit;
@@ -81,12 +85,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   children: [
                     const Text(
                       'Ваши нормы',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
-                    _buildInfoRow('BMR (базальный метаболизм):', '${_bmr.toStringAsFixed(0)} ккал'),
-                    _buildInfoRow('DCI (с учетом активности):', '${_dci.toStringAsFixed(0)} ккал'),
-                    _buildInfoRow('Норма калорий:', '${_calorieNorm.toStringAsFixed(0)} ккал'),
+                    _buildInfoRow('BMR (базальный метаболизм):',
+                        '${_bmr.toStringAsFixed(0)} ккал'),
+                    _buildInfoRow('DCI (с учетом активности):',
+                        '${_dci.toStringAsFixed(0)} ккал'),
+                    _buildInfoRow('Норма калорий:',
+                        '${_calorieNorm.toStringAsFixed(0)} ккал'),
                     const SizedBox(height: 8),
                     const Text(
                       'BMR - количество калорий, необходимое для поддержания жизнедеятельности в покое\n'
@@ -106,7 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 16),
             _buildGoalSection(),
             const Divider(height: 32),
-            
+
             const Text(
               'Персональные данные',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -114,7 +122,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 16),
             _buildPersonalDataSection(),
             const Divider(height: 32),
-            
+
             const Text(
               'Смена пароля',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -122,7 +130,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(height: 16),
             _buildPasswordSection(),
             const Divider(height: 32),
-            
+
             const SizedBox(height: 16),
             _buildDangerZone(),
           ],
@@ -155,8 +163,10 @@ class _SettingsPageState extends State<SettingsPage> {
               value: _selectedGoal,
               items: const [
                 DropdownMenuItem(value: 'Похудение', child: Text('Похудение')),
-                DropdownMenuItem(value: 'Поддержание', child: Text('Поддержание')),
-                DropdownMenuItem(value: 'Набор массы', child: Text('Набор массы')),
+                DropdownMenuItem(
+                    value: 'Поддержание', child: Text('Поддержание')),
+                DropdownMenuItem(
+                    value: 'Набор массы', child: Text('Набор массы')),
               ],
               onChanged: (value) {
                 setState(() {
@@ -233,14 +243,25 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              decoration: const InputDecoration(labelText: 'Уровень активности'),
+              decoration:
+                  const InputDecoration(labelText: 'Уровень активности'),
               value: _activityLevel,
               items: const [
-                DropdownMenuItem(value: 'Сидячий образ жизни', child: Text('Сидячий образ жизни')),
-                DropdownMenuItem(value: 'Тренировки 1-3 раза в неделю', child: Text('Тренировки 1-3 раза в неделю')),
-                DropdownMenuItem(value: 'Тренировки 3-5 раз в неделю', child: Text('Тренировки 3-5 раз в неделю')),
-                DropdownMenuItem(value: 'Тренировки 6-7 раз в неделю', child: Text('Тренировки 6-7 раз в неделю')),
-                DropdownMenuItem(value: 'Профессиональный спорт или физическая работа', child: Text('Профессиональный спорт')),
+                DropdownMenuItem(
+                    value: 'Сидячий образ жизни',
+                    child: Text('Сидячий образ жизни')),
+                DropdownMenuItem(
+                    value: 'Тренировки 1-3 раза в неделю',
+                    child: Text('Тренировки 1-3 раза в неделю')),
+                DropdownMenuItem(
+                    value: 'Тренировки 3-5 раз в неделю',
+                    child: Text('Тренировки 3-5 раз в неделю')),
+                DropdownMenuItem(
+                    value: 'Тренировки 6-7 раз в неделю',
+                    child: Text('Тренировки 6-7 раз в неделю')),
+                DropdownMenuItem(
+                    value: 'Профессиональный спорт или физическая работа',
+                    child: Text('Профессиональный спорт')),
               ],
               onChanged: (value) {
                 setState(() {
@@ -373,7 +394,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _changePassword() {
-    if (_oldPasswordController.text.isEmpty || _newPasswordController.text.isEmpty) {
+    if (_oldPasswordController.text.isEmpty ||
+        _newPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Заполните все поля')),
       );
@@ -400,7 +422,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
-    
+
     _oldPasswordController.clear();
     _newPasswordController.clear();
   }
@@ -417,7 +439,13 @@ class _SettingsPageState extends State<SettingsPage> {
             child: const Text('Отмена'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              Navigator.pop(context); // Закрываем диалог
+
+              // Выходим из аккаунта
+              context.read<AuthBloc>().add(AuthLogout());
+
+              // Переходим на экран входа
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -436,7 +464,8 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Удаление аккаунта'),
-        content: const Text('Вы уверены? Это действие необратимо. Все ваши данные будут удалены.'),
+        content: const Text(
+            'Вы уверены? Это действие необратимо. Все ваши данные будут удалены.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -458,7 +487,7 @@ class _SettingsPageState extends State<SettingsPage> {
       MaterialPageRoute(builder: (_) => const LoginPage()),
       (route) => false,
     );
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Аккаунт удален')),
     );
