@@ -54,7 +54,9 @@ class AuthRepository {
     final db = await database.database;
 
     final map = _userToMap(user);
-    debugPrint('📝 Creating user in local DB: $map');
+    debugPrint(
+        '📝 Creating user in local DB with hasCompletedInitialParams: ${user.hasCompletedInitialParams}');
+    debugPrint('📝 User data: $map');
 
     try {
       await db.insert(
@@ -74,25 +76,7 @@ class AuthRepository {
   Future<User> updateUser(User user) async {
     final db = await database.database;
 
-    final map = {
-      'id': user.id,
-      'email': user.email,
-      'name': user.name,
-      'birth_date': user.birthDate?.toIso8601String(),
-      'gender': user.gender,
-      'height': user.height,
-      'weight': user.weight,
-      'neck_circumference': user.neckCircumference,
-      'waist_circumference': user.waistCircumference,
-      'hip_circumference': user.hipCircumference,
-      'goal': user.goal,
-      'activity_level': user.activityLevel,
-      'calorie_deficit': user.calorieDeficit,
-      'calorie_surplus': user.calorieSurplus,
-      'created_at': user.createdAt.toIso8601String(),
-      'has_completed_initial_params': user.hasCompletedInitialParams ? 1 : 0,
-    };
-
+    final map = _userToMap(user);
     debugPrint('Updating user with map: $map');
 
     await db.update(
@@ -103,6 +87,19 @@ class AuthRepository {
     );
 
     return user;
+  }
+
+  // Добавить метод для проверки существования пользователя без обновления
+  Future<bool> userExists(String userId) async {
+    final db = await database.database;
+
+    final result = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+
+    return result.isNotEmpty;
   }
 
   // Вспомогательный метод для конвертации User в Map с правильными именами колонок

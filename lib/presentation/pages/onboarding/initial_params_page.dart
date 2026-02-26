@@ -384,11 +384,11 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
 
         if (!mounted) return;
 
-        // Показываем уведомление и ждем нажатия OK
-        await showDialog(
+// Показываем диалог и ЖДЕМ его закрытия
+        final shouldNavigate = await showDialog<bool>(
           context: context,
-          barrierDismissible: false, // Нельзя закрыть по клику вне диалога
-          builder: (context) => AlertDialog(
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) => AlertDialog(
             title: const Text('Успешно!'),
             content: const Text('Ваши параметры сохранены.\n\n'
                 'На основе этих данных будут рассчитаны ваши нормы КБЖУ и воды.\n'
@@ -396,7 +396,7 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context); // Закрываем диалог
+                  Navigator.pop(dialogContext, true);
                 },
                 child: const Text('OK'),
               ),
@@ -404,9 +404,19 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
           ),
         );
 
-        // После закрытия диалога переходим на главный экран
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/main');
+// Только после закрытия диалога (нажатия OK) переходим на главный экран
+        if (shouldNavigate == true && mounted) {
+          debugPrint('➡️ Navigating to main page after dialog closed');
+
+          // Обновляем состояние AuthBloc перед переходом
+          context.read<AuthBloc>().add(AuthUpdateUser(updatedUser));
+
+          // Небольшая задержка для обновления состояния
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/main');
+          }
         }
       } catch (e) {
         debugPrint('❌ Error saving params: $e');

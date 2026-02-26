@@ -96,32 +96,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       if (result['success'] == true) {
         final userData = result['user'] as Map<String, dynamic>;
+
+        // Явно преобразуем данные перед созданием User
+        debugPrint('📥 Creating User from data: $userData');
         final user = User.fromJson(userData);
 
-        // Принудительно синхронизируем с локальной БД
+        // Проверяем, что данные сохранились правильно
+        debugPrint(
+            '✅ User created with hasCompletedInitialParams: ${user.hasCompletedInitialParams}');
+
+        // Сохраняем в локальную БД только если пользователя нет
         try {
           final existingUser =
               await AppRepositoryProvider.auth.getUserById(user.id);
           if (existingUser == null) {
             await AppRepositoryProvider.auth.createUser(user);
+            debugPrint(
+                '✅ User created in local DB with hasCompletedInitialParams: ${user.hasCompletedInitialParams}');
           } else {
-            await AppRepositoryProvider.auth.updateUser(user);
+            debugPrint('✅ User exists in local DB, skipping creation');
+            // НЕ обновляем локальную БД данными из Supabase при входе
           }
         } catch (e) {
-          debugPrint('⚠️ Local DB sync error: $e');
+          debugPrint('⚠️ Local DB error: $e');
         }
-
-        final hasParams = user.height != null &&
-            user.weight != null &&
-            user.birthDate != null;
-
-        debugPrint('📊 User data from Supabase:');
-        debugPrint('  - height: ${user.height}');
-        debugPrint('  - weight: ${user.weight}');
-        debugPrint('  - birthDate: ${user.birthDate}');
-        debugPrint(
-            '  - hasCompletedInitialParams: ${user.hasCompletedInitialParams}');
-        debugPrint('  - hasParams from data: $hasParams');
 
         emit(state.copyWith(
           isAuthenticated: true,
@@ -162,7 +160,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   Future<void> _onAuthLogout(AuthLogout event, Emitter<AuthState> emit) async {
-    await SupabaseService.signOut();
+    // НЕ обновляем локальную БД при выходе
+    // Просто очищаем состояние
     emit(const AuthState.initial());
   }
 }

@@ -1,4 +1,6 @@
 // lib/domain/entities/user.dart
+import 'package:flutter/foundation.dart';
+
 class User {
   final String id;
   final String email;
@@ -37,12 +39,29 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // Явно преобразуем has_completed_initial_params
+    bool completedParams = false;
+
+    if (json.containsKey('has_completed_initial_params')) {
+      final value = json['has_completed_initial_params'];
+      if (value is bool) {
+        completedParams = value;
+      } else if (value is int) {
+        completedParams = value == 1;
+      } else if (value is String) {
+        completedParams = value.toLowerCase() == 'true' || value == '1';
+      }
+    }
+
+    debugPrint(
+        '🔄 Converting has_completed_initial_params: ${json['has_completed_initial_params']} -> $completedParams');
+
     return User(
       id: json['id'] as String,
       email: json['email'] as String,
       name: json['name'] as String?,
-      birthDate: json['birth_date'] != null 
-          ? DateTime.parse(json['birth_date'] as String) 
+      birthDate: json['birth_date'] != null
+          ? DateTime.parse(json['birth_date'] as String)
           : null,
       gender: json['gender'] as String?,
       height: (json['height'] as num?)?.toDouble(),
@@ -55,7 +74,7 @@ class User {
       calorieDeficit: json['calorie_deficit'] as int?,
       calorieSurplus: json['calorie_surplus'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
-      hasCompletedInitialParams: json['has_completed_initial_params'] == 1 ? true : false,
+      hasCompletedInitialParams: completedParams,
     );
   }
 

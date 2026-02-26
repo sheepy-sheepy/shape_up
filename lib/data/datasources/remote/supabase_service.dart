@@ -70,7 +70,6 @@ class SupabaseService {
       final response = await supabase.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: 'com.example.shape_up://login-callback',
       );
 
       if (response.user != null) {
@@ -108,18 +107,32 @@ class SupabaseService {
       final response =
           await supabase.from('users').select().eq('id', userId).single();
 
+      debugPrint('📥 Raw user data from Supabase: $response');
+
+      // Проверяем и преобразуем has_completed_initial_params
+      if (response.containsKey('has_completed_initial_params')) {
+        final value = response['has_completed_initial_params'];
+        // Преобразуем в булево значение, если оно пришло как число
+        if (value is int) {
+          response['has_completed_initial_params'] = value == 1;
+        } else if (value is bool) {
+          response['has_completed_initial_params'] = value;
+        } else {
+          response['has_completed_initial_params'] = false;
+        }
+      }
+
       return response;
     } catch (e) {
-      debugPrint('Error getting user data: $e');
+      debugPrint('❌ Error getting user data: $e');
       // Если пользователя нет в таблице, возвращаем базовые данные
       final user = supabase.auth.currentUser;
       if (user != null) {
+        // user.createdAt уже строка, не нужно вызывать toIso8601String
         return {
           'id': user.id,
           'email': user.email,
-          'created_at': user.createdAt is String
-              ? DateTime.parse(user.createdAt as String)
-              : user.createdAt as DateTime,
+          'created_at': user.createdAt ?? DateTime.now().toIso8601String(),
           'has_completed_initial_params': false,
         };
       }
@@ -175,9 +188,15 @@ class SupabaseService {
 
         final userData = await getUserData(response.user!.id);
 
-        // Проверяем, прошел ли пользователь onboarding
+        // Явно проверяем значение
         final hasCompletedParams =
             userData['has_completed_initial_params'] == true;
+
+        debugPrint('📊 User data from Supabase after conversion:');
+        debugPrint(
+            '  - hasCompletedInitialParams raw: ${userData['has_completed_initial_params']}');
+        debugPrint(
+            '  - hasCompletedInitialParams converted: $hasCompletedParams');
 
         return {
           'success': true,
@@ -522,7 +541,13 @@ class SupabaseService {
 
 // Выход из системы
   static Future<void> signOut() async {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      debugPrint('✅ Signed out from Supabase');
+      // НЕ удаляем локальные данные
+    } catch (e) {
+      debugPrint('❌ Error signing out: $e');
+    }
   }
 
   // Проверка статуса подтверждения email

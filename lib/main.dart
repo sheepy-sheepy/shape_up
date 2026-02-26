@@ -74,7 +74,6 @@ void main() async {
   // await _resetDatabase();
   // await _clearSharedPreferences();
 
-// Initialize localization for Russian
   try {
     await initializeDateFormatting('ru', null);
   } catch (e) {

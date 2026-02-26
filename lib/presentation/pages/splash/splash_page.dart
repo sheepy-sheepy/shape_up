@@ -28,12 +28,15 @@ class _SplashPageState extends State<SplashPage> {
     if (authState.isAuthenticated && authState.user != null) {
       debugPrint('👤 User authenticated: ${authState.user!.email}');
       debugPrint(
-          '👤 Has completed params: ${authState.user!.hasCompletedInitialParams}');
-      debugPrint('👤 Needs onboarding: ${authState.needsOnboarding}');
+          '👤 Has completed params from Supabase: ${authState.user!.hasCompletedInitialParams}');
 
-      // Используем комбинированную проверку
-      if (authState.user!.hasCompletedInitialParams &&
-          !authState.needsOnboarding) {
+      // Проверяем наличие всех необходимых данных
+      final hasAllData = authState.user!.height != null &&
+          authState.user!.weight != null &&
+          authState.user!.birthDate != null;
+
+      // Используем hasCompletedInitialParams из Supabase как основной источник
+      if (authState.user!.hasCompletedInitialParams && hasAllData) {
         debugPrint('➡️ Redirecting to main page');
         Navigator.pushReplacementNamed(context, '/main');
       } else {

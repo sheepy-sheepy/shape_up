@@ -430,27 +430,33 @@ class _SettingsPageState extends State<SettingsPage> {
   void _logout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text('Выход'),
         content: const Text('Вы уверены, что хотите выйти?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Отмена'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context); // Закрываем диалог
+              // Закрываем диалог
+              Navigator.pop(dialogContext);
 
-              // Выходим из аккаунта
-              context.read<AuthBloc>().add(AuthLogout());
+              // Выходим из аккаунта в Supabase (это не удаляет данные из локальной БД)
+              await SupabaseService.signOut();
 
-              // Переходим на экран входа
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-                (route) => false,
-              );
+              // Очищаем состояние AuthBloc
+              if (mounted) {
+                context.read<AuthBloc>().add(AuthLogout());
+
+                // Переходим на экран входа
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
+              }
             },
             child: const Text('Выйти'),
           ),
