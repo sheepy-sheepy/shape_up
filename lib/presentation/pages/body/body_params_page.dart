@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shape_up/data/datasources/remote/supabase_service.dart';
 import 'package:shape_up/data/repositories/app_repository_provider.dart';
 import 'package:shape_up/domain/entities/body_measurement.dart';
 import 'package:shape_up/domain/entities/user.dart';
@@ -31,14 +32,16 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
   Future<void> _checkTodayMeasurement() async {
     final authState = context.read<AuthBloc>().state;
     if (authState.user == null) return;
-    
-    final hasMeasurement = await AppRepositoryProvider.body.hasMeasurementForDate(
+
+    // Сначала проверяем локальную БД
+    final hasLocalMeasurement =
+        await AppRepositoryProvider.body.hasMeasurementForDate(
       authState.user!.id,
       DateTime.now(),
     );
-    
+
     setState(() {
-      _hasTodayMeasurement = hasMeasurement;
+      _hasTodayMeasurement = hasLocalMeasurement;
     });
   }
 
@@ -60,7 +63,7 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 24),
-            
+
             if (_hasTodayMeasurement) ...[
               Container(
                 padding: const EdgeInsets.all(12),
@@ -84,7 +87,7 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
               ),
               const SizedBox(height: 24),
             ],
-            
+
             // Вес
             TextField(
               controller: _weightController,
@@ -97,7 +100,7 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
               enabled: !_hasTodayMeasurement,
             ),
             const SizedBox(height: 16),
-            
+
             // Обхват шеи
             TextField(
               controller: _neckController,
@@ -110,7 +113,7 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
               enabled: !_hasTodayMeasurement,
             ),
             const SizedBox(height: 16),
-            
+
             // Обхват талии
             TextField(
               controller: _waistController,
@@ -123,7 +126,7 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
               enabled: !_hasTodayMeasurement,
             ),
             const SizedBox(height: 16),
-            
+
             // Обхват бедер
             TextField(
               controller: _hipController,
@@ -136,19 +139,23 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
               enabled: !_hasTodayMeasurement,
             ),
             const SizedBox(height: 24),
-            
+
             // Кнопка сохранения
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _hasTodayMeasurement || _isLoading ? null : _saveMeasurements,
+                onPressed: _hasTodayMeasurement || _isLoading
+                    ? null
+                    : _saveMeasurements,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _hasTodayMeasurement ? Colors.grey : null,
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator()
-                    : Text(_hasTodayMeasurement ? 'Уже добавлено сегодня' : 'Сохранить'),
+                    : Text(_hasTodayMeasurement
+                        ? 'Уже добавлено сегодня'
+                        : 'Сохранить'),
               ),
             ),
           ],
@@ -170,18 +177,18 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
     }
 
     setState(() => _isLoading = true);
-    
+
     try {
       final authState = context.read<AuthBloc>().state;
       if (authState.user == null) throw Exception('User not found');
-      
+
       final userId = authState.user!.id;
       final today = DateTime.now();
       final weight = double.parse(_weightController.text);
       final neck = double.parse(_neckController.text);
       final waist = double.parse(_waistController.text);
       final hip = double.parse(_hipController.text);
-      
+
       // Расчет % жира
       final bodyFat = _calculator.calculateBodyFatPercentage(
         waist: waist,
@@ -190,8 +197,20 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
         gender: authState.user!.gender ?? 'Мужской',
         hip: hip,
       );
-      
-      // Сохраняем измерение
+
+      // 1. Сохраняем в Supabase
+      await SupabaseService.supabase.from('body_measurements').insert({
+        'user_id': userId,
+        'date': today.toIso8601String().split('T')[0],
+        'weight': weight,
+        'neck_circumference': neck,
+        'waist_circumference': waist,
+        'hip_circumference': hip,
+        'body_fat_percentage': bodyFat,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // 2. Сохраняем в локальную БД
       await AppRepositoryProvider.body.addMeasurement(
         BodyMeasurement(
           userId: userId,
@@ -204,8 +223,8 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
           createdAt: DateTime.now(),
         ),
       );
-      
-      // Обновляем текущий вес пользователя
+
+      // 3. Обновляем текущий вес пользователя в локальной БД
       final updatedUser = User(
         id: userId,
         email: authState.user!.email,
@@ -213,7 +232,7 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
         birthDate: authState.user!.birthDate,
         gender: authState.user!.gender,
         height: authState.user!.height,
-        weight: weight,
+        weight: weight, // Обновляем вес
         neckCircumference: neck,
         waistCircumference: waist,
         hipCircumference: hip,
@@ -224,17 +243,18 @@ class _BodyParamsPageState extends State<BodyParamsPage> {
         createdAt: authState.user!.createdAt,
         hasCompletedInitialParams: true,
       );
-      
+
       await AppRepositoryProvider.auth.updateUser(updatedUser);
-      
+
       if (!mounted) return;
-      
+
       // Показываем уведомление
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Внимание'),
-          content: const Text('Параметры сохранены. Следующее обновление доступно завтра.'),
+          content: const Text(
+              'Параметры сохранены. Следующее обновление доступно завтра.'),
           actions: [
             TextButton(
               onPressed: () {
