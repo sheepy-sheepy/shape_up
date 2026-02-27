@@ -142,15 +142,15 @@ class CalculateNutrition {
     if (gender == 'Мужской') {
       return 495 /
               (1.0324 -
-                  0.19077 * log((waist - neck) / ln10) +
-                  0.15456 * log((height) / ln10)) -
+                  0.19077 * (log(waist - neck) / ln10) +
+                  0.15456 * (log(height) / ln10)) -
           450;
     } else {
       if (hip == null) return 0;
       return 495 /
               (1.29579 -
-                  0.35004 * log((waist + hip - neck) / ln10) +
-                  0.22100 * log((height) / ln10)) -
+                  (0.35004 * (log(waist + hip - neck) / ln10)) +
+                  (0.22100 * (log(height) / ln10))) -
           450;
     }
   }

@@ -306,7 +306,47 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
         final waist = double.parse(_waistController.text);
         final hip = double.parse(_hipController.text);
 
-        // 1. Сохраняем в Supabase
+        // Показываем диалог подтверждения
+        final shouldSave = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            title: const Text('Подтверждение'),
+            content: const Text(
+                'Вы уверены, что хотите сохранить эти параметры?\n\n'
+                'После сохранения вы не сможете изменить эти параметры на текущий день:'
+                '\n• Обхват шеи'
+                '\n• Обхват талии'
+                '\n• Обхват бедер'
+                '\n• Вес'
+                '\n\nЭти параметры используются для расчета норм КБЖУ и воды.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, false); // Отмена
+                },
+                child: const Text('Отмена'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, true); // Подтверждение
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.blue,
+                ),
+                child: const Text('Сохранить'),
+              ),
+            ],
+          ),
+        );
+
+        // Если пользователь нажал "Отмена", просто выходим
+        if (shouldSave != true) {
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        // Пользователь подтвердил - сохраняем данные
         debugPrint('📤 Saving to Supabase...');
         final supabaseResult = await SupabaseService.saveInitialParams({
           'height': height,
@@ -324,7 +364,6 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
           throw Exception(supabaseResult['message']);
         }
 
-        // 2. Сохраняем в локальную БД
         debugPrint('💾 Saving to local database...');
         final updatedUser = User(
           id: userId,
@@ -351,7 +390,6 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
           await AppRepositoryProvider.auth.updateUser(updatedUser);
         }
 
-        // 3. Сохраняем первую запись измерений
         debugPrint('📏 Saving body measurements...');
         final bodyFat = _calculator.calculateBodyFatPercentage(
           waist: waist,
@@ -374,50 +412,17 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
           ),
         );
 
-        // 4. Отмечаем, что onboarding пройден
         await AppRepositoryProvider.auth.setInitialParamsCompleted(userId);
 
-        // 5. Обновляем состояние AuthBloc
+        // Обновляем состояние AuthBloc
         context.read<AuthBloc>().add(AuthUpdateUser(updatedUser));
 
         debugPrint('✅ All data saved successfully!');
 
         if (!mounted) return;
 
-// Показываем диалог и ЖДЕМ его закрытия
-        final shouldNavigate = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => AlertDialog(
-            title: const Text('Успешно!'),
-            content: const Text('Ваши параметры сохранены.\n\n'
-                'На основе этих данных будут рассчитаны ваши нормы КБЖУ и воды.\n'
-                'Теперь вы можете пользоваться приложением.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext, true);
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-
-// Только после закрытия диалога (нажатия OK) переходим на главный экран
-        if (shouldNavigate == true && mounted) {
-          debugPrint('➡️ Navigating to main page after dialog closed');
-
-          // Обновляем состояние AuthBloc перед переходом
-          context.read<AuthBloc>().add(AuthUpdateUser(updatedUser));
-
-          // Небольшая задержка для обновления состояния
-          await Future.delayed(const Duration(milliseconds: 100));
-
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/main');
-          }
-        }
+        // Сразу переходим на главный экран
+        Navigator.pushReplacementNamed(context, '/main');
       } catch (e) {
         debugPrint('❌ Error saving params: $e');
         if (!mounted) return;
