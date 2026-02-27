@@ -44,7 +44,7 @@ class CalculateNutrition {
       age: age,
       gender: gender,
     );
-    
+
     final activityMultiplier = getActivityMultiplier(activityLevel);
     return bmr * activityMultiplier;
   }
@@ -71,7 +71,7 @@ class CalculateNutrition {
     required String goal,
   }) {
     double proteinPercent, fatPercent, carbPercent;
-    
+
     switch (goal) {
       case 'Похудение':
         proteinPercent = 0.40;
@@ -107,7 +107,7 @@ class CalculateNutrition {
     required String activityLevel,
   }) {
     double baseMultiplier = gender == 'Мужской' ? 35.0 : 31.0;
-    
+
     double activityMultiplier;
     switch (activityLevel) {
       case 'Сидячий образ жизни':
@@ -140,21 +140,25 @@ class CalculateNutrition {
     double? hip,
   }) {
     if (gender == 'Мужской') {
-      return 86.010 * log((waist - neck) / ln10) - 
-             70.041 * log(height / ln10) + 
-             36.76;
+      return 495 /
+              (1.0324 -
+                  0.19077 * log((waist - neck) / ln10) +
+                  0.15456 * log((height) / ln10)) -
+          450;
     } else {
       if (hip == null) return 0;
-      return 163.205 * log((waist + hip - neck) / ln10) - 
-             97.684 * log(height / ln10) - 
-             78.387;
+      return 495 /
+              (1.29579 -
+                  0.35004 * log((waist + hip - neck) / ln10) +
+                  0.22100 * log((height) / ln10)) -
+          450;
     }
   }
 
   int calculateAge(DateTime birthDate) {
     final today = DateTime.now();
     int age = today.year - birthDate.year;
-    if (today.month < birthDate.month || 
+    if (today.month < birthDate.month ||
         (today.month == birthDate.month && today.day < birthDate.day)) {
       age--;
     }
