@@ -72,7 +72,7 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Введите рост';
-                    final height = int.tryParse(value);
+                    final height = double.tryParse(value);
                     if (height == null || height < 140 || height > 220) {
                       return 'Рост должен быть от 140 до 220 см';
                     }
@@ -92,7 +92,7 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Введите вес';
-                    final weight = int.tryParse(value);
+                    final weight = double.tryParse(value);
                     if (weight == null || weight < 30 || weight > 200) {
                       return 'Вес должен быть от 30 до 200 кг';
                     }
@@ -113,7 +113,7 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
                   validator: (value) {
                     if (value == null || value.isEmpty)
                       return 'Введите обхват шеи';
-                    final neck = int.tryParse(value);
+                    final neck = double.tryParse(value);
                     if (neck == null || neck < 20 || neck > 100) {
                       return 'Обхват шеи должен быть от 20 до 100 см';
                     }
@@ -134,7 +134,7 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
                   validator: (value) {
                     if (value == null || value.isEmpty)
                       return 'Введите обхват талии';
-                    final waist = int.tryParse(value);
+                    final waist = double.tryParse(value);
                     if (waist == null || waist < 40 || waist > 200) {
                       return 'Обхват талии должен быть от 40 до 200 см';
                     }
@@ -155,7 +155,7 @@ class _InitialParamsPageState extends State<InitialParamsPage> {
                   validator: (value) {
                     if (value == null || value.isEmpty)
                       return 'Введите обхват бедер';
-                    final hip = int.tryParse(value);
+                    final hip = double.tryParse(value);
                     if (hip == null || hip < 40 || hip > 200) {
                       return 'Обхват бедер должен быть от 40 до 200 см';
                     }

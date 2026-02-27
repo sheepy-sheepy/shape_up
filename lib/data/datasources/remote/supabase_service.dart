@@ -67,14 +67,23 @@ class SupabaseService {
   static Future<Map<String, dynamic>> signUp(
       String email, String password) async {
     try {
+      // Сначала проверяем, существует ли пользователь
+      final emailCheck = await checkEmailExists(email);
+      if (emailCheck['exists'] == true) {
+        return {
+          'success': false,
+          'message': 'User already registered',
+          'error': 'User already registered',
+        };
+      }
+
       final response = await supabase.auth.signUp(
         email: email,
         password: password,
+        emailRedirectTo: 'com.example.shape_up://login-callback',
       );
 
       if (response.user != null) {
-        // Пользователь создан, но email не подтвержден
-        // Данные пользователя будут в таблице users после подтверждения email
         return {
           'success': true,
           'message':
@@ -82,12 +91,21 @@ class SupabaseService {
           'user': response.user,
         };
       }
+
       return {
         'success': false,
         'message': 'Ошибка при регистрации',
       };
     } on AuthException catch (e) {
       debugPrint('AuthException: ${e.message}');
+
+      if (e.message.contains('User already registered')) {
+        return {
+          'success': false,
+          'message': 'User already registered',
+        };
+      }
+
       return {
         'success': false,
         'message': _getFriendlyErrorMessage(e.message),
@@ -98,6 +116,47 @@ class SupabaseService {
         'success': false,
         'message': e.toString(),
       };
+    }
+  }
+
+  static Future<Map<String, dynamic>> checkEmailExists(String email) async {
+    try {
+      // Проверяем в public.users
+      final response = await supabase
+          .from('users')
+          .select('id, email')
+          .eq('email', email)
+          .maybeSingle();
+
+      if (response != null) {
+        debugPrint('✅ Email $email found in public.users');
+        return {
+          'exists': true,
+          'message': 'Пользователь с таким email уже существует',
+        };
+      }
+
+      // Если не нашли в public.users, проверяем в auth.users через RPC
+      try {
+        final authUser = await supabase
+            .rpc('check_user_exists', params: {'email_param': email});
+
+        if (authUser != null && authUser['exists'] == true) {
+          debugPrint('✅ Email $email found in auth.users');
+          return {
+            'exists': true,
+            'message': 'Пользователь с таким email уже существует',
+          };
+        }
+      } catch (e) {
+        debugPrint('Error checking auth.users: $e');
+      }
+
+      debugPrint('✅ Email $email is available');
+      return {'exists': false};
+    } catch (e) {
+      debugPrint('❌ Error checking email: $e');
+      return {'exists': false, 'error': e.toString()};
     }
   }
 
@@ -147,7 +206,6 @@ class SupabaseService {
       await supabase.auth.resend(
         type: OtpType.signup,
         email: email,
-        emailRedirectTo: 'com.example.shape_up://login-callback',
       );
 
       return {
